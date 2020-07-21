@@ -32,7 +32,7 @@
 #include "fmt.h"
 #include "ifile.h"
 
-extern Handle preTerminationEvent;
+extern Handle terminationRequestEvent;
 
 static MyThread errDispThread;
 static u8 ALIGN(8) errDispThreadStack[0xD00];
@@ -248,7 +248,7 @@ void ERRF_HandleCommands(void)
         {
             ERRF_GetErrInfo(&info, (cmdbuf + 1), sizeof(ERRF_FatalErrInfo));
             ERRF_SaveErrorToFile(&info);
-            if(!menuShouldExit && (info.type != ERRF_ERRTYPE_LOGGED || info.procId == 0))
+            if(info.type != ERRF_ERRTYPE_LOGGED || info.procId == 0)
             {
                 menuEnter();
 
@@ -315,7 +315,7 @@ void errDispThreadMain(void)
 
     do
     {
-        handles[0] = preTerminationEvent;
+        handles[0] = terminationRequestEvent;
         handles[1] = serverHandle;
         handles[2] = sessionHandle;
 
@@ -359,7 +359,7 @@ void errDispThreadMain(void)
             }
         }
     }
-    while(!preTerminationRequested);
+    while(!terminationRequest);
 
     svcCloseHandle(sessionHandle);
     svcCloseHandle(clientHandle);

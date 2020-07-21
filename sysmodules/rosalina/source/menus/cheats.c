@@ -1944,7 +1944,7 @@ void RosalinaMenu_Cheats(void)
 
             Draw_FlushFramebuffer();
             Draw_Unlock();
-        } while (!(waitInput() & KEY_B) && !menuShouldExit);
+        } while (!(waitInput() & BUTTON_B) && !terminationRequest);
     }
     else
     {
@@ -1982,18 +1982,18 @@ void RosalinaMenu_Cheats(void)
             Draw_FlushFramebuffer();
             Draw_Unlock();
 
-            if (menuShouldExit) break;
+            if (terminationRequest) break;
 
             u32 pressed;
             do
             {
                 pressed = waitInputWithTimeout(50);
                 if (pressed != 0) break;
-            } while (pressed == 0 && !menuShouldExit);
+            } while (pressed == 0 && !terminationRequest);
 
-            if (pressed & KEY_B)
+            if (pressed & BUTTON_B)
                 break;
-            else if ((pressed & KEY_A) && R_SUCCEEDED(r))
+            else if ((pressed & BUTTON_A) && R_SUCCEEDED(r))
             {
                 if (cheats[selected]->active)
                 {
@@ -2004,13 +2004,13 @@ void RosalinaMenu_Cheats(void)
                     r = Cheat_MapMemoryAndApplyCheat(pid, cheats[selected]);
                 }
             }
-            else if (pressed & KEY_DOWN)
+            else if (pressed & BUTTON_DOWN)
                 selected++;
-            else if (pressed & KEY_UP)
+            else if (pressed & BUTTON_UP)
                 selected--;
-            else if (pressed & KEY_LEFT)
+            else if (pressed & BUTTON_LEFT)
                 selected -= CHEATS_PER_MENU_PAGE;
-            else if (pressed & KEY_RIGHT)
+            else if (pressed & BUTTON_RIGHT)
             {
                 if (selected + CHEATS_PER_MENU_PAGE < cheatCount)
                     selected += CHEATS_PER_MENU_PAGE;
@@ -2025,7 +2025,7 @@ void RosalinaMenu_Cheats(void)
 
             pagePrev = page;
             page = selected / CHEATS_PER_MENU_PAGE;
-        } while (!menuShouldExit);
+        } while (!terminationRequest);
     }
 
 }

@@ -1,4 +1,3 @@
-
 /*
 *   This file is part of Luma3DS.
 *   Copyright (C) 2016-2020 Aurora Wright, TuxSH
@@ -8,16 +7,17 @@
 
 #include "minisoc.h"
 #include <sys/socket.h>
-#include <3ds.h>
+#include <3ds/ipc.h>
+#include <3ds/os.h>
+#include <3ds/synchronization.h>
+#include <3ds/result.h>
 #include <string.h>
-#include "utils.h"
 
 s32 miniSocRefCount = 0;
 static u32 socContextAddr = 0x08000000;
 static u32 socContextSize = 0x60000;
 static Handle miniSocHandle;
 static Handle miniSocMemHandle;
-static bool exclusiveStateEntered = false;
 
 bool miniSocEnabled = false;
 
@@ -55,41 +55,6 @@ static Result SOCU_Shutdown(void)
     return cmdbuf[1];
 }
 
-// unsafe but what can I do?
-void miniSocLockState(void)
-{
-    Result res = 0;
-    __dmb();
-    if (!exclusiveStateEntered && isServiceUsable("ndm:u"))
-    {
-        ndmuInit();
-        res = NDMU_EnterExclusiveState(NDM_EXCLUSIVE_STATE_INFRASTRUCTURE);
-        if (R_SUCCEEDED(res))
-            res = NDMU_LockState(); // prevents ndm from switching to StreetPass when the lid is closed
-        exclusiveStateEntered = R_SUCCEEDED(res);
-        __dmb();
-    }
-}
-
-void miniSocUnlockState(bool force)
-{
-    Result res = 0;
-
-    __dmb();
-    if (exclusiveStateEntered)
-    {
-        if (!force)
-        {
-            res = NDMU_UnlockState();
-            if (R_SUCCEEDED(res))
-                res = NDMU_LeaveExclusiveState();
-        }
-        ndmuExit();
-        exclusiveStateEntered = R_FAILED(res);
-        __dmb();
-    }
-}
-
 Result miniSocInit(void)
 {
     if(AtomicPostIncrement(&miniSocRefCount))
@@ -110,7 +75,7 @@ Result miniSocInit(void)
     ret = srvGetServiceHandle(&miniSocHandle, "soc:U");
     if(ret != 0) goto cleanup;
 
-    ret = svcControlMemoryEx(&tmp, socContextAddr, 0, socContextSize, MEMOP_ALLOC, MEMREGION_SYSTEM | MEMPERM_READ | MEMPERM_WRITE, true);
+    ret = svcControlMemory(&tmp, socContextAddr, 0, socContextSize, MEMOP_ALLOC, MEMPERM_READ | MEMPERM_WRITE);
     if(ret != 0) goto cleanup;
 
     socContextAddr = tmp;
@@ -123,11 +88,8 @@ Result miniSocInit(void)
     ret = SOCU_Initialize(miniSocMemHandle, socContextSize);
     if(ret != 0) goto cleanup;
 
-    miniSocLockState();
-
-    svcKernelSetState(0x10000, 0x10);
+    svcKernelSetState(0x10000, 2);
     miniSocEnabled = true;
-
     return 0;
 
 cleanup:
@@ -154,6 +116,7 @@ cleanup:
 
 Result miniSocExitDirect(void)
 {
+    //if (miniSocRefCount != 0) __builtin_trap();
     Result ret = 0;
     u32 tmp;
 
@@ -168,10 +131,8 @@ Result miniSocExitDirect(void)
     svcControlMemory(&tmp, socContextAddr, socContextAddr, socContextSize, MEMOP_FREE, MEMPERM_DONTCARE);
     if(ret == 0)
     {
-        miniSocUnlockState(false);
-
+        svcKernelSetState(0x10000, 2);
         miniSocEnabled = false;
-        svcKernelSetState(0x10000, 0x10);
     }
     return ret;
 }

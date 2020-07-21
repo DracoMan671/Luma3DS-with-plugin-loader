@@ -27,11 +27,9 @@
 #pragma once
 
 #include <3ds/svc.h>
-#include <3ds/srv.h>
 #include <3ds/result.h>
 #include <3ds/ipc.h>
 #include "csvc.h"
-#include "luma_shared_config.h"
 
 // For accessing physmem uncached (and directly)
 #define PA_PTR(addr)            (void *)((u32)(addr) | 1 << 31)
@@ -59,12 +57,19 @@ static inline void *decodeArmBranch(const void *src)
     return (void *)((const u8 *)src + 8 + off);
 }
 
-static inline bool isServiceUsable(const char *name)
+static inline void assertSuccess(Result res)
 {
-    bool r;
-    return R_SUCCEEDED(srvIsServiceRegistered(&r, name)) && r;
+    if(R_FAILED(res))
+        svcBreak(USERBREAK_PANIC);
 }
 
-void formatMemoryPermission(char *outbuf, MemPerm perm);
-void formatUserMemoryState(char *outbuf, MemState state);
-u32 formatMemoryMapOfProcess(char *outbuf, u32 bufLen, Handle handle);
+static inline void error(u32* cmdbuf, Result rc)
+{
+    cmdbuf[0] = IPC_MakeHeader(0, 1, 0);
+    cmdbuf[1] = rc;
+}
+
+extern bool  isN3DS;
+
+Result OpenProcessByName(const char *name, Handle *h);
+Result SaveSettings(void);

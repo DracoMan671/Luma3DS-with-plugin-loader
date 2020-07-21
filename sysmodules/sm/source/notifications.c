@@ -8,18 +8,6 @@ This is part of 3ds_sm, which is licensed under the MIT license (see LICENSE for
 #include "notifications.h"
 #include "processes.h"
 
-#include <stdatomic.h>
-
-static bool isNotificationInhibited(const ProcessData *processData, u32 notificationId)
-{
-    (void)processData;
-    switch(notificationId)
-    {
-        default:
-            return false;
-    }
-}
-
 static bool doPublishNotification(ProcessData *processData, u32 notificationId, u32 flags)
 {
     if((flags & 1) && processData->nbPendingNotifications != 0) // only send if not already pending
@@ -138,7 +126,7 @@ Result PublishToSubscriber(u32 notificationId, u32 flags)
 {
     for(ProcessData *node = processDataInUseList.first; node != NULL; node = node->next)
     {
-        if(!node->notificationEnabled || isNotificationInhibited(node, notificationId))
+        if(!node->notificationEnabled)
             continue;
 
         u16 i;
@@ -158,7 +146,7 @@ Result PublishAndGetSubscriber(u32 *pidCount, u32 *pidList, u32 notificationId, 
     u32 nb = 0;
     for(ProcessData *node = processDataInUseList.first; node != NULL; node = node->next)
     {
-        if(!node->notificationEnabled || isNotificationInhibited(node, notificationId))
+        if(!node->notificationEnabled)
             continue;
 
         u16 i;

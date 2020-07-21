@@ -34,8 +34,6 @@
 #include "buttons.h"
 #include "arm9_exception_handlers.h"
 
-// See https://github.com/LumaTeam/luma3ds_exception_dump_parser
-
 void installArm9Handlers(void)
 {
     vu32 *dstVeneers = (vu32 *)0x08000000;
