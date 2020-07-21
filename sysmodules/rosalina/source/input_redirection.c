@@ -32,8 +32,6 @@
 #include "process_patches.h"
 #include "menus.h"
 #include "memory.h"
-#include "sleep.h"
-#include "sock_util.h"
 
 bool inputRedirectionEnabled = false;
 Handle inputRedirectionThreadStartedEvent;
@@ -122,13 +120,6 @@ void inputRedirectionThreadMain(void)
         pfd.fd = sock;
         pfd.events = POLLIN;
         pfd.revents = 0;
-
-        if (Sleep__Status())
-        {
-            while (!Wifi__IsConnected()
-                    && inputRedirectionEnabled && !terminationRequest)
-                svcSleepThread(1000000000ULL);
-        }
 
         int pollres = socPoll(&pfd, 1, 10);
         if(pollres > 0 && (pfd.revents & POLLIN))
@@ -283,10 +274,6 @@ static Result InputRedirection_DoUndoIrPatches(Handle processHandle, bool doPatc
         syncLoc = PA_FROM_VA_PTR(off2);
         cppFlagLoc = PA_FROM_VA_PTR(off3);
 
-        totalSize = (u32)(textTotalRoundedSize + rodataTotalRoundedSize + dataTotalRoundedSize);
-
-        svcGetProcessInfo(&startAddress, processHandle, 0x10005);
-        res = svcMapProcessMemoryEx(CUR_PROCESS_HANDLE, 0x00100000, processHandle, (u32) startAddress, totalSize);
         patchPrepared = true;
     }
 
@@ -304,44 +291,6 @@ static Result InputRedirection_DoUndoIrPatches(Handle processHandle, bool doPatc
             }
             else
             {
-                u32 hidDataPhys = (u32)PA_FROM_VA_PTR(hidData);
-                u32 hidCodePhys = (u32)PA_FROM_VA_PTR(&hidCodePatchFunc);
-                u32 hidHook[] = {
-                    0xE59F3004, // ldr r3,  [pc, #4]
-                    0xE59FC004, // ldr r12, [pc, #4]
-                    0xE12FFF1C, // bx  r12
-                    hidDataPhys,
-                    hidCodePhys,
-                };
-
-                u32 *off = (u32 *)memsearch((u8 *)0x00100000, &hidOrigRegisterAndValue, totalSize, sizeof(hidOrigRegisterAndValue));
-                if(off == NULL)
-                {
-                    svcUnmapProcessMemoryEx(CUR_PROCESS_HANDLE, 0x00100000, totalSize);
-                    return -1;
-                }
-
-                u32 *off2 = (u32 *)memsearch((u8 *)off + sizeof(hidOrigRegisterAndValue), &hidOrigRegisterAndValue, totalSize - ((u32)off - 0x00100000), sizeof(hidOrigRegisterAndValue));
-                if(off2 == NULL)
-                {
-                    svcUnmapProcessMemoryEx(CUR_PROCESS_HANDLE, 0x00100000, totalSize);
-                    return -2;
-                }
-
-                u32 *off3 = (u32 *)memsearch((u8 *)0x00100000, &hidOrigCode, totalSize, sizeof(hidOrigCode));
-                if(off3 == NULL)
-                {
-                    svcUnmapProcessMemoryEx(CUR_PROCESS_HANDLE, 0x00100000, totalSize);
-                    return -3;
-                }
-
-                hidRegPatchOffsets[0] = off;
-                hidRegPatchOffsets[1] = off2;
-                hidPatchJumpLoc = off3;
-
-                *off = *off2 = hidDataPhys;
-                memcpy(off3, &hidHook, sizeof(hidHook));
-                hidPatched = true;
                 // This "NOP"s out a WaitSynchronisation1 (on the event bound to the 'IR' interrupt) or the check of a previous one
                 *syncLoc = 0xE3A00000; // mov r0, #0
             }
@@ -361,7 +310,6 @@ static Result InputRedirection_DoUndoIrPatches(Handle processHandle, bool doPatc
                 syncLoc[0] = 0xEF000024; // svc 0x24
             }
 
-        res = svcUnmapProcessMemoryEx(CUR_PROCESS_HANDLE, 0x00100000, totalSize);
             *cppFlagLoc = origCppFlag;
         }
     }
@@ -460,69 +408,6 @@ static Result InputRedirection_DoUndoHidPatches(Handle processHandle, bool doPat
     return res;
 }
 
-            if(irPatched)
-            {
-                memcpy(irHookLoc, &irOrigReadingCode, sizeof(irOrigReadingCode));
-                if(useOldSyncCode)
-                    memcpy(irWaitSyncLoc, &irOrigWaitSyncCodeOld, sizeof(irOrigWaitSyncCodeOld));
-                else
-                    memcpy(irWaitSyncLoc, &irOrigWaitSyncCode, sizeof(irOrigWaitSyncCode));
-                memcpy(irCppFlagLoc, &irOrigCppFlagCode, sizeof(irOrigCppFlagCode));
-
-                irPatched = false;
-            }
-            else
-            {
-                u32 irDataPhys = (u32)PA_FROM_VA_PTR(irData);
-                u32 irCodePhys = (u32)PA_FROM_VA_PTR(&irCodePatchFunc);
-
-                u32 irHook[] = {
-                    0xE5940000, // ldr r0, [r4]
-                    0xE1A01005, // mov r1, r5
-                    0xE59FC000, // ldr r12, [pc] (actually +8)
-                    0xE12FFF3C, // blx r12
-                    irCodePhys,
-                };
-
-                u32 *off = (u32 *)memsearch((u8 *)0x00100000, &irOrigReadingCode, totalSize, sizeof(irOrigReadingCode) - 4);
-                if(off == NULL)
-                {
-                    svcUnmapProcessMemoryEx(CUR_PROCESS_HANDLE, 0x00100000, totalSize);
-                    return -4;
-                }
-
-                u32 *off2 = (u32 *)memsearch((u8 *)0x00100000, &irOrigWaitSyncCode, totalSize, sizeof(irOrigWaitSyncCode));
-                if(off2 == NULL)
-                {
-                    off2 = (u32 *)memsearch((u8 *)0x00100000, &irOrigWaitSyncCodeOld, totalSize, sizeof(irOrigWaitSyncCodeOld));
-                    if(off2 == NULL)
-                    {
-                        svcUnmapProcessMemoryEx(CUR_PROCESS_HANDLE, 0x00100000, totalSize);
-                        return -5;
-                    }
-
-                    useOldSyncCode = true;
-                }
-                else
-                    useOldSyncCode = false;
-
-                u32 *off3 = (u32 *)memsearch((u8 *)0x00100000, &irOrigCppFlagCode, totalSize, sizeof(irOrigCppFlagCode));
-                if(off3 == NULL)
-                {
-                    svcUnmapProcessMemoryEx(CUR_PROCESS_HANDLE, 0x00100000, totalSize);
-                    return -6;
-                }
-
-                *(void **)(irCodePhys + 8) = decodeArmBranch(off + 4);
-                *(void **)(irCodePhys + 12) = (void*)irDataPhys;
-
-                irHookLoc = off;
-                irWaitSyncLoc = off2;
-                irCppFlagLoc = off3;
-
-                irOrigReadingCode[4] = off[4]; // Copy the branch.
-
-                memcpy(irHookLoc, &irHook, sizeof(irHook));
 Result InputRedirection_Disable(s64 timeout)
 {
     if(!inputRedirectionEnabled)
@@ -548,7 +433,6 @@ Result InputRedirection_DoOrUndoPatches(void)
 
     // Prevent hid and ir from running, in any case
 
-        res = svcUnmapProcessMemoryEx(CUR_PROCESS_HANDLE, 0x00100000, totalSize);
     svcKernelSetState(0x10000, 4);
 
     Result res = OpenProcessByName("hid", &hidProcHandle);
