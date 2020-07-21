@@ -37,11 +37,8 @@
 struct KExtParameters
 {
     u32 basePA;
-    u32 stolenSystemMemRegionSize;
     void *originalHandlers[4];
     u32 L1MMUTableAddrs[4];
-
-    volatile bool done;
 
     CfwInfo cfwInfo;
 } kExtParameters = { .basePA = 0x12345678 }; // place this in .data
@@ -62,31 +59,15 @@ void relocateAndSetupMMU(u32 coreId, u32 *L1Table)
         memset((u32 *)(p0->basePA + (__bss_start__ - __start__)), 0, __bss_end__ - __bss_start__);
 
         // Map the kernel ext at K11EXT_VA
-        // 4KB extended small pages:
-        // Outer Write-Through cached, No Allocate on Write, Buffered
-        // Inner Cached Write-Back Write-Allocate, Buffered
-        // This was changed at some point (8.0 maybe?), it was outer noncached before
+        // 4KB extended small pages: [SYS:RW USR:-- X  TYP:NORMAL SHARED OUTER NOCACHE, INNER CACHED WB WA]
         for(u32 offset = 0; offset < (u32)(__end__ - __start__); offset += 0x1000)
-            L2Table[offset >> 12] = (p0->basePA + offset) | 0x596;
-
-        p0->done = true;
-
-        // DSB, Flush Prefetch Buffer (more or less "isb")
-        __asm__ __volatile__ ("mcr p15, 0, %0, c7, c10, 4" :: "r" (0) : "memory");
-        __asm__ __volatile__ ("mcr p15, 0, %0, c7, c5, 4" :: "r" (0) : "memory");
+            L2Table[offset >> 12] = (p0->basePA + offset) | 0x516;
 
         __asm__ __volatile__ ("sev");
     }
-    else {
-        do
-        {
-            __asm__ __volatile__ ("wfe");
-        } while(!p0->done);
+    else
+        __asm__ __volatile__ ("wfe");
 
-        // DSB, Flush Prefetch Buffer (more or less "isb")
-        __asm__ __volatile__ ("mcr p15, 0, %0, c7, c10, 4" :: "r" (0) : "memory");
-        __asm__ __volatile__ ("mcr p15, 0, %0, c7, c5, 4" :: "r" (0) : "memory");
-    }
     // bit31 idea thanks to SALT
     // Maps physmem so that, if addr is in physmem(0, 0x30000000), it can be accessed uncached&rwx as addr|(1<<31)
     u32 attribs = 0x40C02; // supersection (rwx for all) of strongly ordered memory, shared
@@ -100,10 +81,6 @@ void relocateAndSetupMMU(u32 coreId, u32 *L1Table)
     L1Table[K11EXT_VA >> 20] = (u32)L2Table | 1;
 
     p->L1MMUTableAddrs[coreId] = (u32)L1Table;
-
-    // DSB, Flush Prefetch Buffer (more or less "isb")
-    __asm__ __volatile__ ("mcr p15, 0, %0, c7, c10, 4" :: "r" (0) : "memory");
-    __asm__ __volatile__ ("mcr p15, 0, %0, c7, c5, 4" :: "r" (0) : "memory");
 }
 
 void bindSGI0Hook(void)
@@ -350,11 +327,7 @@ void main(FcramLayout *layout, KCoreContext *ctxs)
     u32 TTBCR_;
     s64 nb;
 
-    cfwInfo = p->cfwInfo;
-    kextBasePa = p->basePA;
-    stolenSystemMemRegionSize = p->stolenSystemMemRegionSize;
-
-    layout->systemSize -= stolenSystemMemRegionSize;
+    layout->systemSize -= __end__ - __start__;
     fcramLayout = *layout;
     coreCtxs = ctxs;
 
@@ -363,6 +336,7 @@ void main(FcramLayout *layout, KCoreContext *ctxs)
     isN3DS = getNumberOfCores() == 4;
     memcpy(L1MMUTableAddrs, (const void *)p->L1MMUTableAddrs, 16);
     exceptionStackTop = (u32 *)0xFFFF2000 + (1 << (32 - TTBCR - 20));
+    cfwInfo = p->cfwInfo;
 
     memcpy(originalHandlers + 1, p->originalHandlers, 16);
     void **arm11SvcTable = (void**)originalHandlers[2];
@@ -376,8 +350,4 @@ void main(FcramLayout *layout, KCoreContext *ctxs)
 
     rosalinaState = 0;
     hasStartedRosalinaNetworkFuncsOnce = false;
-
-    // DSB, Flush Prefetch Buffer (more or less "isb")
-    __asm__ __volatile__ ("mcr p15, 0, %0, c7, c10, 4" :: "r" (0) : "memory");
-    __asm__ __volatile__ ("mcr p15, 0, %0, c7, c5, 4" :: "r" (0) : "memory");
 }

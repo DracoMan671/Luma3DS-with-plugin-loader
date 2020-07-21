@@ -9,15 +9,15 @@
 #include "gdb/net.h"
 #include "gdb/debug.h"
 
-extern Handle preTerminationEvent;
-extern bool preTerminationRequested;
+extern Handle terminationRequestEvent;
+extern bool terminationRequest;
 
 void GDB_RunMonitor(GDBServer *server)
 {
     Handle handles[3 + MAX_DEBUG];
     Result r = 0;
 
-    handles[0] = preTerminationEvent;
+    handles[0] = terminationRequestEvent;
     handles[1] = server->super.shall_terminate_event;
     handles[2] = server->statusUpdated;
 
@@ -81,5 +81,5 @@ void GDB_RunMonitor(GDBServer *server)
             RecursiveLock_Unlock(&ctx->lock);
         }
     }
-    while(!preTerminationRequested && server->super.running);
+    while(!terminationRequest && server->super.running);
 }

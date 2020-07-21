@@ -27,7 +27,6 @@
 #pragma once
 
 #include <3ds/types.h>
+#include "menu.h"
 
-u32 getMinLuminancePreset(void);
-u32 getMaxLuminancePreset(void);
-u32 getCurrentLuminance(bool top);
+void ProcessPatchesMenu_PatchUnpatchFSDirectly(void);

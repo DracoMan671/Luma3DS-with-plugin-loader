@@ -26,7 +26,6 @@
 
 #include <3ds.h>
 #include "menus/process_list.h"
-#include "process_patches.h"
 #include "memory.h"
 #include "csvc.h"
 #include "draw.h"
@@ -198,7 +197,7 @@ end:
         Draw_FlushFramebuffer();
         Draw_Unlock();
     }
-    while(!(waitInput() & KEY_B) && !menuShouldExit);
+    while(!(waitInput() & BUTTON_B) && !terminationRequest);
 
 #undef TRY
 }
@@ -494,21 +493,21 @@ static void ProcessListMenu_MemoryViewer(const ProcessInfo *info)
 
                 u32 pressed = waitInputWithTimeout(1000);
 
-                if(pressed & KEY_A)
+                if(pressed & BUTTON_A)
                     editing = !editing;
-                else if(pressed & KEY_X)
+                else if(pressed & BUTTON_X)
                 {
                     if(checkMode(MENU_MODE_GOTO))
                         finishJumping();
                     else
                         gotoAddress = __builtin_bswap32(((u32)menus[MENU_MODE_NORMAL].buf) + menus[MENU_MODE_NORMAL].selected);
                 }
-                else if(pressed & KEY_Y)
+                else if(pressed & BUTTON_Y)
                 {
                     if(checkMode(MENU_MODE_SEARCH))
                         finishSearching();
                 }
-                else if(pressed & KEY_SELECT)
+                else if(pressed & BUTTON_SELECT)
                 {
                     clearMenu();
                     ProcessListMenu_DumpMemory(info->name, menus[MENU_MODE_NORMAL].buf, menus[MENU_MODE_NORMAL].max);
@@ -518,35 +517,35 @@ static void ProcessListMenu_MemoryViewer(const ProcessInfo *info)
                 if(editing)
                 {
                     // Edit the highlighted byte
-                    if(pressed & KEY_LEFT)
+                    if(pressed & BUTTON_LEFT)
                         selectedByteAdd0x10();
-                    else if(pressed & KEY_RIGHT)
+                    else if(pressed & BUTTON_RIGHT)
                         selectedByteSub0x10();
-                    else if(pressed & KEY_UP)
+                    else if(pressed & BUTTON_UP)
                         selectedByteIncrement();
-                    else if(pressed & KEY_DOWN)
+                    else if(pressed & BUTTON_DOWN)
                         selectedByteDecrement();
                 }
                 else
                 {
                     // Move the cursor
-                    if(pressed & KEY_LEFT)
+                    if(pressed & BUTTON_LEFT)
                         selectedMoveLeft();
-                    else if(pressed & KEY_RIGHT)
+                    else if(pressed & BUTTON_RIGHT)
                         selectedMoveRight();
-                    else if(pressed & KEY_UP)
+                    else if(pressed & BUTTON_UP)
                         selectedMoveUp();
-                    else if(pressed & KEY_DOWN)
+                    else if(pressed & BUTTON_DOWN)
                         selectedMoveDown();
 
-                    else if(pressed & KEY_L)
+                    else if(pressed & BUTTON_L1)
                     {
                         if(menuMode == MENU_MODE_NORMAL)
                             viewHeap();
                         else if(menuMode == MENU_MODE_SEARCH)
                             searchPatternReduce();
                     }
-                    else if(pressed & KEY_R)
+                    else if(pressed & BUTTON_R1)
                     {
                         if(menuMode == MENU_MODE_NORMAL)
                             viewCode();
@@ -555,7 +554,7 @@ static void ProcessListMenu_MemoryViewer(const ProcessInfo *info)
                     }
                 }
 
-                if(pressed & KEY_B) // go back to the list, or the simple viewer
+                if(pressed & BUTTON_B) // go back to the list, or the simple viewer
                 {
                     if(menuMode != MENU_MODE_NORMAL)
                     {
@@ -569,7 +568,7 @@ static void ProcessListMenu_MemoryViewer(const ProcessInfo *info)
                 if(menus[menuMode].selected >= menus[menuMode].max)
                     menus[menuMode].selected = menus[menuMode].max - 1;
             }
-            while(!menuShouldExit);
+            while(!terminationRequest);
 
             clearMenu();
         }
@@ -686,7 +685,7 @@ void RosalinaMenu_ProcessList(void)
         Draw_FlushFramebuffer();
         Draw_Unlock();
 
-        if(menuShouldExit)
+        if(terminationRequest)
             break;
 
         u32 pressed;
@@ -699,19 +698,19 @@ void RosalinaMenu_ProcessList(void)
             if(memcmp(infos, infosPrev, sizeof(infos)) != 0)
                 break;
         }
-        while(pressed == 0 && !menuShouldExit);
+        while(pressed == 0 && !terminationRequest);
 
-        if(pressed & KEY_B)
+        if(pressed & BUTTON_B)
             break;
-        else if(pressed & KEY_A)
+        else if(pressed & BUTTON_A)
             ProcessListMenu_HandleSelected(&infos[selected]);
-        else if(pressed & KEY_DOWN)
+        else if(pressed & BUTTON_DOWN)
             selected++;
-        else if(pressed & KEY_UP)
+        else if(pressed & BUTTON_UP)
             selected--;
-        else if(pressed & KEY_LEFT)
+        else if(pressed & BUTTON_LEFT)
             selected -= PROCESSES_PER_MENU_PAGE;
-        else if(pressed & KEY_RIGHT)
+        else if(pressed & BUTTON_RIGHT)
         {
             if(selected + PROCESSES_PER_MENU_PAGE < processAmount)
                 selected += PROCESSES_PER_MENU_PAGE;
@@ -729,5 +728,5 @@ void RosalinaMenu_ProcessList(void)
         pagePrev = page;
         page = selected / PROCESSES_PER_MENU_PAGE;
     }
-    while(!menuShouldExit);
+    while(!terminationRequest);
 }
