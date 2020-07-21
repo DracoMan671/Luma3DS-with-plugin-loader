@@ -77,7 +77,7 @@ void svcInvalidateEntireInstructionCache(void);
  * @param srcAddress Address of the mapped block in the source process.
  * @param size Size of the block of the memory to map (truncated to a multiple of 0x1000 bytes).
 */
-Result svcMapProcessMemoryEx(Handle dstProcessHandle, u32 destAddress, Handle srcProcessHandle, u32 vaSrc, u32 size);
+Result svcMapProcessMemoryEx(Handle dstProcessHandle, u32 destAddress, u32 vaSrc, u32 size);
 
 /**
  * @brief Unmaps a block of process memory.
