@@ -116,6 +116,8 @@ void (*mcuReboot)(void);
 void (*coreBarrier)(void);
 
 CfwInfo cfwInfo;
+u32 kextBasePa;
+u32 stolenSystemMemRegionSize;
 
 vu32 rosalinaState;
 bool hasStartedRosalinaNetworkFuncsOnce;
