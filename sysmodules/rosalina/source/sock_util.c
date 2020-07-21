@@ -16,8 +16,8 @@
 #include "sock_util.h"
 #include "sleep.h"
 
-extern Handle terminationRequestEvent;
-extern bool terminationRequest;
+extern Handle preTerminationEvent;
+extern bool preTerminationRequested;
 
 // soc's poll function is odd, and doesn't like -1 as fd.
 // so this compacts everything together
@@ -106,7 +106,7 @@ Result server_init(struct sock_server *serv)
 Result server_bind(struct sock_server *serv, u16 port)
 {
     int server_sockfd;
-    Handle handles[2] = { terminationRequestEvent, serv->shall_terminate_event };
+    Handle handles[2] = { preTerminationEvent, serv->shall_terminate_event };
     s32 idx = -1;
     server_sockfd = socSocket(AF_INET, SOCK_STREAM, 0);
 
@@ -165,7 +165,7 @@ Result server_bind(struct sock_server *serv, u16 port)
 
 static bool server_should_exit(struct sock_server *serv)
 {
-    return svcWaitSynchronization(serv->shall_terminate_event, 0) == 0 || svcWaitSynchronization(terminationRequestEvent, 0) == 0;
+    return svcWaitSynchronization(serv->shall_terminate_event, 0) == 0 || svcWaitSynchronization(preTerminationEvent, 0) == 0;
 }
 
 void server_run(struct sock_server *serv)
@@ -174,7 +174,7 @@ void server_run(struct sock_server *serv)
 
     serv->running = true;
     svcSignalEvent(serv->started_event);
-    while(serv->running && !terminationRequest)
+    while(serv->running && !preTerminationRequested)
     {
         if(server_should_exit(serv))
             goto abort_connections;

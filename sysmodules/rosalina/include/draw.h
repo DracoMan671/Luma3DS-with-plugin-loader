@@ -54,6 +54,9 @@
 #define GPU_TRANSFER_CNT            REG32(0x10400C18)
 #define GPU_CMDLIST_CNT             REG32(0x104018F0)
 
+#define LCD_TOP_BRIGHTNESS          REG32(0x10202240)
+#define LCD_BOT_BRIGHTNESS          REG32(0x10202A40)
+
 #define FB_BOTTOM_VRAM_ADDR         ((void *)0x1F48F000) // cached
 #define FB_BOTTOM_VRAM_PA           0x1848F000
 #define FB_BOTTOM_SIZE              (320 * 240 * 2)
@@ -88,7 +91,8 @@ u32 Draw_DrawFormattedString(u32 posX, u32 posY, u32 color, const char *fmt, ...
 
 void Draw_FillFramebuffer(u32 value);
 void Draw_ClearFramebuffer(void);
-u32 Draw_AllocateFramebufferCache(void);
+Result Draw_AllocateFramebufferCache(u32 size);
+Result Draw_AllocateFramebufferCacheForScreenshot(u32 size);
 void Draw_FreeFramebufferCache(void);
 void *Draw_GetFramebufferCache(void);
 u32 Draw_GetFramebufferCacheSize(void);
@@ -96,6 +100,8 @@ u32 Draw_SetupFramebuffer(void);
 void Draw_RestoreFramebuffer(void);
 void Draw_FlushFramebuffer(void);
 u32 Draw_GetCurrentFramebufferAddress(bool top, bool left);
+// Width is actually height as the 3ds screen is rotated 90 degrees
+void Draw_GetCurrentScreenInfo(u32 *width, bool *is3d, bool top);
 
 void Draw_CreateBitmapHeader(u8 *dst, u32 width, u32 heigth);
-void Draw_ConvertFrameBufferLines(u8 *buf, u32 startingLine, u32 numLines, bool top, bool left);
+void Draw_ConvertFrameBufferLines(u8 *buf, u32 width, u32 startingLine, u32 numLines, bool top, bool left);
